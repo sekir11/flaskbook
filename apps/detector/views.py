@@ -8,7 +8,7 @@ import torch
 import torchvision
 from apps.app import db
 from apps.crud.models import User
-from apps.detector.forms import DetectorForm, UploadImageForm
+from apps.detector.forms import DeleteForm, DetectorForm, UploadImageForm
 from apps.detector.models import UserImage, UserImageTag
 from flask import (
     Blueprint,
@@ -16,6 +16,7 @@ from flask import (
     flash,
     redirect,
     render_template,
+    request,
     send_from_directory,
     template_rendered,
     url_for,
@@ -53,11 +54,14 @@ def index():
         # 物体検知フォームをインスタンス化
         detector_form = DetectorForm()
 
+        delete_form = DeleteForm()
+
     return render_template(
         "detector/index.html",
         user_images=user_images,
         user_image_tag_dict=user_image_tag_dict,
         detector_form=detector_form,
+        delete_form=delete_form,
     )
 
 
@@ -125,6 +129,91 @@ def detect(image_id):
         return redirect(url_for("detector.index"))
 
     return redirect(url_for("detector.index"))
+
+
+@dt.route("/images/delete/<string:image_id>", methods=["POST"])
+@login_required
+def delete_image(image_id):
+    try:
+        # user_image_tagsテーブルからレコードを削除する
+        db.session.query(UserImageTag).filter(
+            UserImageTag.user_image_id == image_id
+        ).delete()
+
+        # user_imagesテーブルからレコードを削除する
+        db.session.query(UserImage).filter(UserImage.id == image_id).delete()
+
+        db.session.commit()
+
+    except SQLAlchemyError as e:
+        flash("画像削除処理でエラーが発生しました。")
+        # エラーログ出力
+        current_app.logger.error(e)
+        db.session.rollback()
+
+    return redirect(url_for("detector.index"))
+
+
+@dt.route("/images/search", methods=["GET"])
+def search():
+
+    # 画像一覧を取得する
+    user_images = db.session.query(User, UserImage).join(
+        UserImage, User.id == UserImage.user_id
+    )
+
+    # GETパラメータから検索ワードを取得する
+    search_text = request.args.get("search")
+    user_image_tag_dict = {}
+    filtered_user_images = []
+
+    # user_imagesをループしuser_imagesに紐づくタグ情報を取得する
+    for user_image in user_images:
+        if not search_text:
+            # タグ一覧を取得する
+            user_image_tags = (
+                db.session.query(UserImageTag)
+                .filter(UserImageTag.user_image_id == user_image.UserImage.id)
+                .all()
+            )
+
+        else:
+            # 検索ワードで絞り込んだんタグを取得する
+            user_image_tags = (
+                db.session.query(UserImageTag)
+                .filter(UserImageTag.user_image_id == user_image.UserImage.id)
+                .filter(UserImageTag.tag_name.like("%" + search_text + "%"))
+                .all()
+            )
+
+            # タグが見つからなかったら画像を返さない
+            if not user_image_tags:
+                continue
+
+            # タグがある場合はタグ情報を取得し直す
+            user_image_tags = (
+                db.session.query(UserImageTag)
+                .filter(UserImageTag.user_image_id == user_image.UserImage.id)
+                .all()
+            )
+
+        # user_image_id をキーとする辞書にタグ情報をセットする
+        user_image_tag_dict[user_image.UserImage.id] = user_image_tags
+
+        # 絞り込み結果のuser_image情報を配列にセットする
+
+        filtered_user_images.append(user_image)
+
+    delete_form = DeleteForm()
+    detector_form = DetectorForm()
+
+    return render_template(
+        "detector/index.html",
+        user_images=filtered_user_images,
+        user_image_tag_dict=user_image_tag_dict,
+        delete_form=delete_form,
+        detector_form=detector_form,
+    )
 
 
 def make_color(lables):
