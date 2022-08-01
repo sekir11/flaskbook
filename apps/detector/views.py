@@ -51,17 +51,12 @@ def index():
 
         user_image_tag_dict[user_image.UserImage.id] = user_image_tags
 
-        # 物体検知フォームをインスタンス化
-        detector_form = DetectorForm()
-
-        delete_form = DeleteForm()
-
     return render_template(
         "detector/index.html",
         user_images=user_images,
         user_image_tag_dict=user_image_tag_dict,
-        detector_form=detector_form,
-        delete_form=delete_form,
+        detector_form=DetectorForm(),
+        delete_form=DeleteForm(),
     )
 
 
