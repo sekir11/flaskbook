@@ -2,5 +2,4 @@
 
 /apps/detector/model.pt
 
-.venv-release
-venv/
+/venv/**
