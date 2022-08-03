@@ -6,3 +6,6 @@ flask run
 
 ## Flask route 確認
 flask route
+
+
+pip install -r requirements.txt
