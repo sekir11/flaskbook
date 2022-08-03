@@ -1,5 +1,5 @@
 /model.pt
 
-/apps/detector/*.pt
+/apps/detector/model.pt
 
-venv/
+venv
